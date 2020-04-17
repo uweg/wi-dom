@@ -1,4 +1,5 @@
 /node_modules
 /build
 /declarations
+/dist
 /wi-dom-*.tgz
