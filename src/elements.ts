@@ -515,6 +515,62 @@ export function textarea(args: Args, value: Value<string>) {
   return new TextArea(args, value);
 }
 
+type OptionItem<T> = { caption: string; value: T };
+
+class Option extends HtmlElement<{ value: string }, ElementBase> {
+  constructor(caption: string, value: string) {
+    super("option", { value: value }, [text(caption)]);
+  }
+
+  async renderArgs(context: number[]) {
+    const result = await super.renderArgs(context);
+    result.value = this.args.value;
+    return result;
+  }
+}
+
+export class Select<T> extends HtmlBlockElement<Args, Option> {
+  constructor(
+    args: Args,
+    private value: Value<T>,
+    private options: OptionItem<T>[]
+  ) {
+    super(
+      "select",
+      args,
+      options.map((o, i) => new Option(o.caption, i.toString()))
+    );
+  }
+
+  async renderArgs(context: number[]) {
+    let result = await super.renderArgs(context);
+
+    const m = contextToString("change", context);
+    const v = this.value.get(null);
+    const ind = this.options.findIndex((s) => s.value === v);
+    if (ind > -1) {
+      result.value = ind.toString();
+    }
+    result.onInput = `__handle.${m}(event)`;
+    if (typeof window !== "undefined") {
+      (window as any).__handle[m] = (e: InputEvent) => {
+        const v = (e.currentTarget as HTMLInputElement).value;
+        this.value.set(this.options[parseInt(v)].value);
+      };
+    }
+
+    return result;
+  }
+}
+
+export function select<T>(
+  args: Args,
+  value: Value<T>,
+  options: OptionItem<T>[]
+) {
+  return new Select(args, value, options);
+}
+
 /**
  * Table
  */

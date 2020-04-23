@@ -1,4 +1,4 @@
-import { div, dyn, text } from "../src/elements";
+import { div, dyn, text, select } from "../src/elements";
 import { Value } from "../src/lib";
 
 function animationFrame() {
@@ -30,4 +30,16 @@ test("dyn", async () => {
   value.set(true);
   await animationFrame();
   expect(container.textContent).toEqual("true");
+});
+
+test("select", async () => {
+  (window as any).__handle = {};
+  const value = new Value(1);
+  const element = select({}, value, [
+    { caption: "one", value: 1 },
+    { caption: "two", value: 2 },
+  ]);
+  expect(await element.renderString([])).toEqual(
+    `<select value="0" onInput="__handle.change_(event)"><option value="0">one</option><option value="1">two</option></select>`
+  );
 });

@@ -1,4 +1,4 @@
-export { Value } from "./value";
+export { Value, ValueContext } from "./value";
 export {
   a,
   body,
@@ -25,5 +25,6 @@ export {
   th,
   thead,
   tr,
+  select,
   ElementBase,
 } from "./elements";
