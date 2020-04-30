@@ -40,6 +40,6 @@ test("select", async () => {
     { caption: "two", value: 2 },
   ]);
   expect(await element.renderString([])).toEqual(
-    `<select value="0" onInput="__handle.change_(event)"><option value="0">one</option><option value="1">two</option></select>`
+    `<select onInput="__handle.change_(event)"><option value="0" selected="selected">one</option><option value="1">two</option></select>`
   );
 });

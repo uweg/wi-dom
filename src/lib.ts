@@ -28,3 +28,5 @@ export {
   select,
   ElementBase,
 } from "./elements";
+export { dynInput } from "./dynElements";
+export { getUrl } from "./helper";

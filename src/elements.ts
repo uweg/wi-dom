@@ -1,4 +1,4 @@
-import { contextToString, escapeXml } from "./helper";
+import { contextToString, escapeXml, getUrl } from "./helper";
 import { Value, ValueContext } from "./value";
 
 export type Args = {
@@ -429,10 +429,8 @@ export class A extends HtmlBlockElement<AArgs, ElementBase> {
   async renderArgs(context: number[]) {
     const result = await super.renderArgs(context);
     const link = (await this.args.link) as any;
-    const str = link[1]
-      .map((l: string) => "/" + encodeURIComponent(JSON.stringify(l)))
-      .join("");
-    result.href = link[0] + str;
+    result.href = getUrl(link);
+
     return result;
   }
 }
@@ -461,8 +459,10 @@ export function button(args: ButtonArgs, content: string) {
  * Input
  */
 
-export class Input extends HtmlBlockElement<Args, never> {
-  constructor(args: Args, private value: Value<string>) {
+type InputArgs = Args & { onInput: (value: string) => void };
+
+export class Input extends HtmlBlockElement<InputArgs, never> {
+  constructor(args: InputArgs, private value: string) {
     super("input", args, []);
   }
 
@@ -470,11 +470,11 @@ export class Input extends HtmlBlockElement<Args, never> {
     let result = await super.renderArgs(context);
 
     const m = contextToString("input", context);
-    result.value = escapeXml(this.value.get(null));
+    result.value = escapeXml(this.value);
     result.onInput = `__handle.${m}(event)`;
     if (typeof window !== "undefined") {
       (window as any).__handle[m] = (e: InputEvent) => {
-        this.value.set((e.currentTarget as HTMLInputElement).value);
+        this.args.onInput((e.currentTarget as HTMLInputElement).value);
       };
     }
 
@@ -482,7 +482,7 @@ export class Input extends HtmlBlockElement<Args, never> {
   }
 }
 
-export function input(args: Args, value: Value<string>) {
+export function input(args: InputArgs, value: string) {
   return new Input(args, value);
 }
 
@@ -516,15 +516,20 @@ export function textarea(args: Args, value: Value<string>) {
 }
 
 type OptionItem<T> = { caption: string; value: T };
+type OptionArgs = { value: string; selected?: boolean };
 
-class Option extends HtmlElement<{ value: string }, ElementBase> {
-  constructor(caption: string, value: string) {
-    super("option", { value: value }, [text(caption)]);
+class Option extends HtmlElement<OptionArgs, ElementBase> {
+  constructor(args: OptionArgs, caption: string) {
+    super("option", args, [text(caption)]);
   }
 
   async renderArgs(context: number[]) {
     const result = await super.renderArgs(context);
     result.value = this.args.value;
+    if (this.args.selected === true) {
+      result.selected = "selected";
+    }
+
     return result;
   }
 }
@@ -538,7 +543,13 @@ export class Select<T> extends HtmlBlockElement<Args, Option> {
     super(
       "select",
       args,
-      options.map((o, i) => new Option(o.caption, i.toString()))
+      options.map(
+        (o, i) =>
+          new Option(
+            { value: i.toString(), selected: value.get(null) === o.value },
+            o.caption
+          )
+      )
     );
   }
 
@@ -546,11 +557,6 @@ export class Select<T> extends HtmlBlockElement<Args, Option> {
     let result = await super.renderArgs(context);
 
     const m = contextToString("change", context);
-    const v = this.value.get(null);
-    const ind = this.options.findIndex((s) => s.value === v);
-    if (ind > -1) {
-      result.value = ind.toString();
-    }
     result.onInput = `__handle.${m}(event)`;
     if (typeof window !== "undefined") {
       (window as any).__handle[m] = (e: InputEvent) => {
