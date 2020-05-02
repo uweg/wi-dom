@@ -1,6 +1,6 @@
 {
   "name": "wi-dom",
-  "version": "0.0.10",
+  "version": "0.0.12",
   "description": "",
   "main": "dist/wi-dom.js",
   "files": [

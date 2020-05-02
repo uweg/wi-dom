@@ -715,7 +715,7 @@ export function text(text: string) {
 export class Dyn extends ElementBase {
   private node: Node | null = null;
   private context: number[] = [];
-  private renderPending = false;
+  private renderPending = 0;
 
   constructor(
     private signal: (context: ValueContext | null) => Promise<ElementBase>
@@ -724,17 +724,18 @@ export class Dyn extends ElementBase {
   }
 
   update = async () => {
-    if (!this.renderPending) {
-      this.renderPending = true;
-      requestAnimationFrame(async () => {
-        this.renderPending = false;
-        const element = this.node as Element | null;
-        if (element !== null) {
-          const newNode = await this.renderNode(this.context);
+    const newValue = this.renderPending + 1;
+    this.renderPending = newValue;
+    requestAnimationFrame(async () => {
+      const element = this.node as Element | null;
+      if (element !== null) {
+        const newNode = await this.renderNode(this.context);
+        if (this.renderPending === newValue) {
+          this.node = newNode;
           element.replaceWith(newNode);
         }
-      });
-    }
+      }
+    });
   };
 
   renderString = async (context: number[]) => {
@@ -746,9 +747,9 @@ export class Dyn extends ElementBase {
     this.context = context;
     const element = await this.signal(this.update);
     const node = await element.renderNode(context);
-    // if (this.node === null) {
-    this.node = node;
-    // }
+    if (this.node === null) {
+      this.node = node;
+    }
 
     return node;
   };
