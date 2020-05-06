@@ -17,7 +17,7 @@ export class DynInput extends ElementBase {
     const _this = this;
     async function update() {
       const v = _this.value.get(update);
-      (node as HTMLInputElement).value = v;
+      (node[0] as HTMLInputElement).value = v;
     }
 
     update();

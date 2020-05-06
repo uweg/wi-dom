@@ -18,7 +18,7 @@ export type Args = {
 export abstract class ElementBase {
   abstract renderString: (context: number[]) => Promise<string>;
 
-  abstract renderNode: (context: number[]) => Promise<Node>;
+  abstract renderNode: (context: number[]) => Promise<Node[]>;
 }
 
 export abstract class HtmlElement<
@@ -62,7 +62,7 @@ export abstract class HtmlElement<
       const c = this.children[i];
       const newContext = context.slice();
       newContext.push(i);
-      result.appendChild(await c.renderNode(newContext));
+      result.append(...(await c.renderNode(newContext)));
     }
 
     const args = await this.renderArgs(context);
@@ -70,7 +70,7 @@ export abstract class HtmlElement<
       result.setAttribute(key, args[key]);
     }
 
-    return result;
+    return [result];
   }
 }
 
@@ -144,7 +144,7 @@ export abstract class HtmlBlockElement<
   }
 
   async renderNode(context: number[]) {
-    const node = await super.renderNode(context);
+    const node = (await super.renderNode(context))[0];
 
     if (this.args.dynClass !== undefined) {
       const _this = this;
@@ -173,7 +173,7 @@ export abstract class HtmlBlockElement<
       await update();
     }
 
-    return node;
+    return [node];
   }
 }
 /**
@@ -701,7 +701,7 @@ export class Text extends ElementBase {
 
   renderString = async () => escapeXml(this.text);
 
-  renderNode = async () => document.createTextNode(this.text);
+  renderNode = async () => [document.createTextNode(this.text)];
 }
 
 export function text(text: string) {
@@ -713,12 +713,12 @@ export function text(text: string) {
  */
 
 export class Dyn extends ElementBase {
-  private node: Node | null = null;
+  private node: Node[] | null = null;
   private context: number[] = [];
   private renderPending = 0;
 
   constructor(
-    private signal: (context: ValueContext | null) => Promise<ElementBase>
+    private signal: (context: ValueContext | null) => Promise<ElementBase[]>
   ) {
     super();
   }
@@ -727,12 +727,18 @@ export class Dyn extends ElementBase {
     const newValue = this.renderPending + 1;
     this.renderPending = newValue;
     requestAnimationFrame(async () => {
-      const element = this.node as Element | null;
+      const element = this.node as Element[] | null;
       if (element !== null) {
-        const newNode = await this.renderNode(this.context);
         if (this.renderPending === newValue) {
+          const newNode = await this.renderNode(this.context);
+          if (newNode.length === 0) {
+            newNode.push(...(await text("").renderNode()));
+          }
           this.node = newNode;
-          element.replaceWith(newNode);
+          element[0].before(...newNode);
+          for (const e of element) {
+            e.remove();
+          }
         }
       }
     });
@@ -740,23 +746,32 @@ export class Dyn extends ElementBase {
 
   renderString = async (context: number[]) => {
     const element = await this.signal(null);
-    return element.renderString(context);
+    return (
+      await Promise.all(element.map((e, i) => e.renderString([...context, i])))
+    ).join("");
   };
 
   renderNode = async (context: number[]) => {
     this.context = context;
     const element = await this.signal(this.update);
-    const node = await element.renderNode(context);
-    if (this.node === null) {
-      this.node = node;
+    const nodes = (
+      await Promise.all(element.map((e, i) => e.renderNode([...context, i])))
+    ).reduce((p, c) => [...p, ...c], []);
+
+    if (nodes.length === 0) {
+      nodes.push(...(await text("").renderNode()));
     }
 
-    return node;
+    if (this.node === null) {
+      this.node = nodes;
+    }
+
+    return nodes;
   };
 }
 
 export function dyn(
-  signal: (context: ValueContext | null) => Promise<ElementBase>
+  signal: (context: ValueContext | null) => Promise<ElementBase[]>
 ) {
   return new Dyn(signal);
 }
