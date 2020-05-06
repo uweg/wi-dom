@@ -17,10 +17,12 @@ export class Value<T> {
   };
 
   set = (value: T) => {
-    this.value = value;
+    if(value !== this.value){
+      this.value = value;
 
-    for (const c of this.context) {
-      c();
+      for (const c of this.context) {
+        c();
+      }
     }
   };
 }
