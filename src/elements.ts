@@ -74,7 +74,7 @@ export abstract class HtmlElement<
   }
 }
 
-export abstract class HtmlBlockElement<
+export class HtmlBlockElement<
   TArgs extends Args,
   TChildren extends ElementBase
 > extends HtmlElement<TArgs, TChildren> {
@@ -175,17 +175,6 @@ export abstract class HtmlBlockElement<
 
     return [node];
   }
-}
-/**
- * Page
- */
-
-export class Page {
-  constructor(public body: Body) {}
-}
-
-export function page(body: Body) {
-  return new Page(body);
 }
 
 /**
@@ -343,6 +332,58 @@ export function p(args: PArgs, children: PChildren[]) {
 }
 
 /**
+ * Ul
+ */
+export function ul(args: Args, children: ElementBase[]) {
+  return new HtmlBlockElement("ul", args, children);
+}
+
+/**
+ * Ol
+ */
+export function ol(args: Args, children: ElementBase[]) {
+  return new HtmlBlockElement("ol", args, children);
+}
+
+/**
+ * Li
+ */
+export function li(args: Args, children: ElementBase[]) {
+  return new HtmlBlockElement("li", args, children);
+}
+
+/**
+ * h1 - h7
+ */
+export function h1(args: Args, children: ElementBase[]) {
+  return new HtmlBlockElement("h1", args, children);
+}
+
+export function h2(args: Args, children: ElementBase[]) {
+  return new HtmlBlockElement("h2", args, children);
+}
+
+export function h3(args: Args, children: ElementBase[]) {
+  return new HtmlBlockElement("h3", args, children);
+}
+
+export function h4(args: Args, children: ElementBase[]) {
+  return new HtmlBlockElement("h4", args, children);
+}
+
+export function h5(args: Args, children: ElementBase[]) {
+  return new HtmlBlockElement("h5", args, children);
+}
+
+export function h6(args: Args, children: ElementBase[]) {
+  return new HtmlBlockElement("h6", args, children);
+}
+
+export function h7(args: Args, children: ElementBase[]) {
+  return new HtmlBlockElement("h7", args, children);
+}
+
+/**
  * Strong
  */
 
@@ -419,7 +460,7 @@ export function br() {
  * A
  */
 
-type AArgs = Args & { link: Promise<Page> };
+type AArgs = Args & { href: string };
 
 export class A extends HtmlBlockElement<AArgs, ElementBase> {
   constructor(args: AArgs, children: ElementBase[]) {
@@ -428,8 +469,7 @@ export class A extends HtmlBlockElement<AArgs, ElementBase> {
 
   async renderArgs(context: number[]) {
     const result = await super.renderArgs(context);
-    const link = (await this.args.link) as any;
-    result.href = getUrl(link);
+    result["href"] = this.args.href;
 
     return result;
   }
@@ -713,9 +753,9 @@ export function text(text: string) {
  */
 
 export class Dyn extends ElementBase {
-  private node: Node[] | null = null;
   private context: number[] = [];
-  private renderPending = 0;
+  private renderPending = false;
+  private nodes: Node[] = [];
 
   constructor(
     private signal: (context: ValueContext | null) => Promise<ElementBase[]>
@@ -724,24 +764,19 @@ export class Dyn extends ElementBase {
   }
 
   update = async () => {
-    const newValue = this.renderPending + 1;
-    this.renderPending = newValue;
-    requestAnimationFrame(async () => {
-      const element = this.node as Element[] | null;
-      if (element !== null) {
-        if (this.renderPending === newValue) {
-          const newNode = await this.renderNode(this.context);
-          if (newNode.length === 0) {
-            newNode.push(...(await text("").renderNode()));
-          }
-          this.node = newNode;
-          element[0].before(...newNode);
-          for (const e of element) {
-            e.remove();
-          }
+    if (!this.renderPending) {
+      this.renderPending = true;
+      requestAnimationFrame(async () => {
+        this.renderPending = false;
+        const newNode = await this.render();
+        const element = this.nodes as Element[];
+        this.nodes = newNode;
+        element[0].before(...newNode);
+        for (const e of element) {
+          e.remove();
         }
-      }
-    });
+      });
+    }
   };
 
   renderString = async (context: number[]) => {
@@ -751,20 +786,25 @@ export class Dyn extends ElementBase {
     ).join("");
   };
 
-  renderNode = async (context: number[]) => {
-    this.context = context;
+  private async render() {
     const element = await this.signal(this.update);
     const nodes = (
-      await Promise.all(element.map((e, i) => e.renderNode([...context, i])))
+      await Promise.all(
+        element.map((e, i) => e.renderNode([...this.context, i]))
+      )
     ).reduce((p, c) => [...p, ...c], []);
 
     if (nodes.length === 0) {
       nodes.push(...(await text("").renderNode()));
     }
 
-    if (this.node === null) {
-      this.node = nodes;
-    }
+    return nodes;
+  }
+
+  renderNode = async (context: number[]) => {
+    this.context = context;
+    const nodes = await this.render();
+    this.nodes = nodes;
 
     return nodes;
   };

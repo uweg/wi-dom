@@ -9,6 +9,14 @@ function animationFrame() {
   });
 }
 
+function timeout(time: number) {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve();
+    }, time);
+  });
+}
+
 test("render", async () => {
   const element = div({ class: ["c"] }, []);
   expect(await element.renderString([])).toEqual(`<div class="c"></div>`);
@@ -28,7 +36,8 @@ test("dyn", async () => {
   expect(container.textContent).toEqual("false");
 
   value.set(true);
-  await animationFrame();
+  // await animationFrame();
+  await timeout(100);
   expect(container.textContent).toEqual("true");
 });
 
